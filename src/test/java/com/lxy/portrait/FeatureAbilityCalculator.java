@@ -16,6 +16,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,13 +43,14 @@ public class FeatureAbilityCalculator {
     @Test
     public void dada() {
         List<Course> list = courseService.list();
-        calculateFeatureAbilities(1,list);
+        Map<String, BigDecimal> stringBigDecimalMap = calculateFeatureAbilities(1, list);
+        System.out.println(stringBigDecimalMap);
     }
 
     public Map<String, BigDecimal> calculateFeatureAbilities(int studentId, List<Course> courseList) {
 
         Map<String, BigDecimal> result = new HashMap<>();
-        BigDecimal[] labels = new BigDecimal[6]; // Initialize label scores
+        BigDecimal[] labels = new BigDecimal[7]; // Initialize label scores
         int[] sortNum = new int[7]; // Initialize course count for each label
 
         // Initialize label scores to 5
@@ -78,36 +80,37 @@ public class FeatureAbilityCalculator {
             QueryWrapper<Score> eq = new QueryWrapper<>();
             eq.eq("studentId", studentId).eq("courseId", course.getId());
 
-            // BigDecimal score = (BigDecimal) scoreService.getOne(eq).getScore();
-            BigDecimal score=new BigDecimal(1);
+            BigDecimal score = new BigDecimal(scoreService.getOne(eq).getScore());
             int sortId = course.getSortId();
             BigDecimal label = labels[sortId];
 
             // Update label score based on course score and clustering centers
             if (score.compareTo(BigDecimal.valueOf(60)) < 0) {
-                label = label.add(BigDecimal.valueOf(-4).divide(BigDecimal.valueOf(sortNum[sortId])));
+                label = label.add(BigDecimal.valueOf(-4).divide(BigDecimal.valueOf(sortNum[sortId]),3, RoundingMode.HALF_UP));
             } else if (score.compareTo(low) < 0) {
-                label = label.add(BigDecimal.ONE.divide(BigDecimal.valueOf(sortNum[sortId])));
+                label = label.add(BigDecimal.ONE.divide(BigDecimal.valueOf(sortNum[sortId]),3, RoundingMode.HALF_UP));
             } else if (score.compareTo(mid) < 0) {
-                label = label.add(BigDecimal.valueOf(2).divide(BigDecimal.valueOf(sortNum[sortId])));
+                label = label.add(BigDecimal.valueOf(2).divide(BigDecimal.valueOf(sortNum[sortId]),3, RoundingMode.HALF_UP));
             } else if (score.compareTo(high) < 0) {
-                label = label.add(BigDecimal.valueOf(3).divide(BigDecimal.valueOf(sortNum[sortId])));
+                label = label.add(BigDecimal.valueOf(3).divide(BigDecimal.valueOf(sortNum[sortId]),3, RoundingMode.HALF_UP));
             } else {
-                label = label.add(BigDecimal.valueOf(4).divide(BigDecimal.valueOf(sortNum[sortId])));
+                label = label.add(BigDecimal.valueOf(4).divide(BigDecimal.valueOf(sortNum[sortId]),3, RoundingMode.HALF_UP));
             }
 
             labels[sortId] = label; // Update label score
         }
 
+        String[] labelStr = {"数学与自然科学","人文","专业基础","专业选修","工程实践","创新能力"};
         // Create result map
-        for (int i = 0; i < labels.length; i++) {
-            result.put("Label" + (i + 1), labels[i]);
+        for (int i = 1; i < labels.length; i++) {
+            result.put(labelStr[i-1], labels[i]);
         }
 
         return result;
     }
 
     public ClusteringResult callPythonForClustering(int courseId){
+        String line = null;
         try {
             // 假设您的Python脚本位于"F:/PycharmProjects/your_script.py"
             // 并且您要传入的课程ID是"123"
@@ -119,23 +122,21 @@ public class FeatureAbilityCalculator {
             // 执行Python脚本
             Process process = Runtime.getRuntime().exec(cmd);
 
-
-
             // 等待脚本执行完成
             process.waitFor();
 
             // 读取脚本的输出
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println(line);
-            }
+            line = reader.readLine();
+            // while ((line = reader.readLine()) != null) {
+            //     System.out.println(line);
+            // }
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
 
-        return new ClusteringResult();
+        return new ClusteringResult(line);
     }
 
 
